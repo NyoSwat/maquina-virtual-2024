@@ -1,7 +1,7 @@
 #include<stdio.h>
 #include<stdlib.h>
 #include"maquina_virtual.h"
-#include"operaciones.h"
+#include"operandos.h"
 
 
 int corrigeRango(int rango){
