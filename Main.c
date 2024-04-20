@@ -25,7 +25,7 @@ int main(int argc, char const *argv[])
     }
     //verificar el argumento "-d" para el modo debug
     if ( argc == 3 && strcmp(argv[2],"-d") == 0 ) {
-       dissasembler(mv);
+       dissasembler(&mv);
     }
     ejecutarMV(&mv);
 
