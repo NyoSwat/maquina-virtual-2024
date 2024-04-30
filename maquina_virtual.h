@@ -12,7 +12,7 @@
 //estructura del procesador de la maquina virtual
 typedef struct {
     char Memoria[NUM_MEMORIA];  
-    unsigned long int  registros[NUM_REGISTROS];    
+    int  registros[NUM_REGISTROS];    
     struct segmentos{
        short int base,size;
     }segmentos[NUM_SEGMENTOS];
@@ -40,13 +40,12 @@ typedef struct {
 }Error;
 
 // Funciones para operar el flujo de la máquina virtual
-void cargaMV(MaquinaVirtual *mv, char*, int*);
+void cargaMV(MaquinaVirtual *mv, char *, int*);
 void disassembler(MaquinaVirtual *mv);
 void ejecutarMV(MaquinaVirtual *mv);
 
 //funciones modularizadas para las funciones de la maquina
 int corrigeRango(int rango);
-void cargaVF(Toperaciones *);
 void LeerByte(char instruccion, char *op1, char *op2, unsigned int *operacion);
 void sumaIP(int *ip,char operando1,char operando2);
 void InformaError(MaquinaVirtual *mv, Error error);
@@ -64,7 +63,7 @@ void imprimeOperando(operando op);
 typedef void (*Toperaciones)(MaquinaVirtual *, operando *);
 typedef void (*funcionSys)(MaquinaVirtual *,Sistema);
 
-void cargaVF(Toperaciones *v);
+void cargaVF(Toperaciones *);
 void loadSYSOperationArray(funcionSys *vecLlamadas);
 
 //funciones de assembler

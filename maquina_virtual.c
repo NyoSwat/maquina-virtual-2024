@@ -1,9 +1,8 @@
 #include<stdio.h>
 #include<stdlib.h>
 #include<math.h>
+#include<string.h>
 #include"maquina_virtual.h"
-//#include"operandos.h"
-//#include"disassembler.h"
 
 
 int corrigeRango(int rango){
@@ -18,25 +17,24 @@ void loadSYSOperationArray(funcionSys *vecLlamadas){
     vecLlamadas[0x2] = writeSys;
 }
 
-void cargaMV(MaquinaVirtual *mv, char argv[], int *falloArch)
+void cargaMV(MaquinaVirtual *mv, char* argv, int *falloArch)
 {
-    char *header = (char*)malloc(sizeof(char));
+    char *header = (char*)malloc(6*sizeof(char));
     char version;
-    int rango;
+    unsigned short int rango;
     FILE *archVMX = fopen(argv,"rb");
 
     if( archVMX == NULL ) {
-        perror("Error al abrir el archivo");
         *falloArch = 1;
     } else {
         //comienza el proceso del archivo .vmx
         fgets(header, 6 * sizeof(char), archVMX ); //obtentiene el header
-        if(stcmp(header,"VMX24") ) {
+        if(strcmp(header,"VMX24") ) {
             printf("error de extensión");
         } else {
             //Tras verificar el encabezado, comienzo a leer el programa
-            fread(version,sizeof(char),1,archVMX);//leo la version
-            fread(rango,sizeof(unsigned short int),1,archVMX);
+            fread(&version,sizeof(char),1,archVMX);//leo la version
+            fread(&rango,sizeof(unsigned short int),1,archVMX);
             rango = corrigeRango(rango); 
             printf("[ %S, %c, %d ]\n",header,version,rango);
 
@@ -44,18 +42,18 @@ void cargaMV(MaquinaVirtual *mv, char argv[], int *falloArch)
             mv->segmentos[0].base = 0x0000;
             mv->segmentos[0].size = rango;
 
-            mv->registros[0] = 0;
+            mv->registros[CS] = 0;
             
             //bloque de lectura del binario para cargarlo en Memoria
             int cont = 0;
-            while (fread(&(mv->Memoria[cont]),sizeof(char),1,archVMX))
+            while (fread(&mv->Memoria[cont],sizeof(char),1,archVMX))
             {
                 if (cont >= mv->segmentos[0].size) {
                     mv->segmentos[1].size += 1;
                 }
+                printf("%s ",mv->Memoria[cont]);//
                 cont++;
             }
-            
         }
     }
     fclose(archVMX);
@@ -65,7 +63,7 @@ void cargaVF(Toperaciones *v){
     //2 operandos
     v[0x00] = MOV; v[0x01] = ADD;
     v[0x02] = SUB; v[0x03] = SWAP;
-    v[0x04] = MUL; v[0x05] = div;
+    v[0x04] = MUL; v[0x05] = DIV;
     v[0x06] = CMP; v[0x07] = SHL;
     v[0x08] = SHR; v[0x09] = AND;
     v[0x0A] = OR;  v[0x0B] = XOR;
@@ -84,22 +82,14 @@ void cargaVF(Toperaciones *v){
 //primer byte de la sentencia de 4
 void LeerByte(char instruccion, char *op1, char *op2, unsigned int *operacion) 
 {
-    if((instruccion & 0xF0) == 0xF0){
-        if((instruccion & 0x03) == 0x00)
-            *operacion = 0xF0;
-        else{
-            if((instruccion & 0x03) == 0x01)
-                *operacion = 0xF1;
-            else
-                *operacion = 0xF3;
-        }
-        *op2 = 0x3;
-        *op1 = 0x3;
-    }else{
+    if((instruccion & 0xF0) == 0xF0)
+        *operacion = 0xF0;
+    else{
         *op1 = (instruccion >> 6) & 0x03;
         *op2 = instruccion & 0x30;
+
         if(*op2 == 0x30){
-            *operacion = instruccion & 0x3F; //aislo codigo de operacion
+            *operacion = instruccion & 0x3F;
             *op2 = 0x3;
         }else{
             *operacion = instruccion & 0x0F;
@@ -135,9 +125,9 @@ void recuperaOperandos(MaquinaVirtual *mv,operando *o,int ip)
 
             case 0x01: //tipo inmediato
                 auxInt |= mv->Memoria[++ip] << 8; //leo en un int auxiliar los 2 bytes que representan el numero inmediato
-    //            printf("set inm %04X\n",auxInt);
+                //printf("set inm %04X\n",auxInt);
                 auxInt |= (mv->Memoria[++ip] & 0x00FF);
-    //            printf("set inm %04X\n",auxInt);
+                //printf("set inm %04X\n",auxInt);
                 o[i].desplazamiento = auxInt;
                 break;
 
@@ -203,16 +193,24 @@ void ejecutarMV(MaquinaVirtual *mv)
     Error error;
 
     cargaVF(arrFunciones);
-    while ( mv->registros[IP] < mv->segmentos[CS].size) {
+    while ( mv->registros[IP] < mv->segmentos[CS].size) 
+    {
         auxIP = mv->registros[IP];
         
         LeerByte(mv->Memoria[auxIP],&(op[0].tipo),&(op[1].tipo),&operacion);
         
         recuperaOperandos(mv,op,auxIP);
 
+        /*printf("operacion %02x\n",operacion);
+        printf("tipo op1 %02x\n",op[0].tipo);
+        printf("tipo op2 %02x\n",op[1].tipo);
+
+        printf(" op1 %d\n",op[0].registro);
+        printf(" op2 %d\n",op[1].registro);*/
+
         sumaIP(&(mv->registros[IP]),op[0].tipo,op[1].tipo);
 
-        ok = (operacion >= 0 && operacion < 12) || (operacion >= 0x30 && operacion < 0x3C) || (operacion == 0xF0);
+        ok = (operacion >= 0 && operacion < 14) || (operacion >= 0x10 && operacion < 0x1A) || (operacion == 0xF0);
         if (ok) 
             arrFunciones[operacion](mv,op);
         else {
@@ -220,10 +218,7 @@ void ejecutarMV(MaquinaVirtual *mv)
             error.invalidInstruction = operacion;
             InformaError(mv,error);
         }
-
     }
-    
-
 }
 
 void disassembler(MaquinaVirtual *mv)
@@ -403,24 +398,24 @@ void imprimeOperando(operando op){
     switch (op.tipo){
 
     case 0x00://memoria
-              obtieneTAG(op.registro,0,nombre);
-              switch (op.segmentoReg){
-              case 0:printf("l[%s + %d]",nombre,op.desplazamiento);
-                  break;
-              case 2:printf("w[%s + %d]",nombre,op.desplazamiento);
-                  break;
-              case 3:printf("b[%s + %d]",nombre,op.desplazamiento);
-                  break;
-              default:printf("[%s + %d]",nombre,op.desplazamiento);
-                  break;
+            obtieneTAG(op.registro,0,nombre);
+            switch (op.segmentoReg){
+            case 0:printf("l[%s + %d]",nombre,op.desplazamiento);
+                break;
+            case 2:printf("w[%s + %d]",nombre,op.desplazamiento);
+                break;
+            case 3:printf("b[%s + %d]",nombre,op.desplazamiento);
+                break;
+            default:printf("[%s + %d]",nombre,op.desplazamiento);
+                break;
               }
         break;
     case 0x01://inmediato
-              printf(" %04X",op.desplazamiento);
+            printf(" %04X",op.desplazamiento);
         break;
     case 0x02://registro
-              obtieneTAG(op.registro,op.segmentoReg,nombre);
-              printf("%s ",nombre);
+            obtieneTAG(op.registro,op.segmentoReg,nombre);
+            printf("%s ",nombre);
         break;
     }
 }
