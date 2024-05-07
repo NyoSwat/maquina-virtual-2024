@@ -1,21 +1,28 @@
 #define NUM_REGISTROS 16
-#define NUM_SEGMENTOS 8
+#define NUM_TABLA_SEGMENTOS 8
 #define NUM_MEMORIA 16384
 
 #define CS 0
 #define DS 1
+#define ES 2
+#define SS 3
+#define KS 4
 #define IP 5
+#define SP 6
+#define BP 7
 #define CC 8
 #define AC 9
 
 
 //estructura del procesador de la maquina virtual
 typedef struct {
-    char Memoria[NUM_MEMORIA];  
+    char header[8];
+    char *Memoria;  
     int  registros[NUM_REGISTROS];    
     struct segmentos{
        short int base,size;
-    }segmentos[NUM_SEGMENTOS];
+    }segmentos[NUM_TABLA_SEGMENTOS];
+    char imagenArchivo[16];
 } MaquinaVirtual;
 
 //estructura de los operandos del lenguaje assembler
@@ -40,15 +47,16 @@ typedef struct {
 }Error;
 
 // Funciones para operar el flujo de la máquina virtual
-void cargaMV(MaquinaVirtual *mv, char *, int*);
+void cargaMV(MaquinaVirtual *mv, char *[], int*);
 void disassembler(MaquinaVirtual *mv);
-void ejecutarMV(MaquinaVirtual *mv);
+void ejecutarMV(MaquinaVirtual *mv, int version, int numInstrucciones);
 
 //funciones modularizadas para las funciones de la maquina
 int corrigeRango(int rango);
 void LeerByte(char instruccion, char *op1, char *op2, unsigned int *operacion);
 void sumaIP(int *ip,char operando1,char operando2);
 void InformaError(MaquinaVirtual *mv, Error error);
+void ejecutaCiclo(MaquinaVirtual *mv, char version, int ip);
 
 //funciones para emplear los operandos de las operaciones del lenguaje assembler
 int getReg(MaquinaVirtual *mv, operando op);
@@ -93,10 +101,18 @@ void LDL(MaquinaVirtual *mv, operando *op);
 void LDH(MaquinaVirtual *mv, operando *op);
 void NOT(MaquinaVirtual *mv, operando *op);
 void STOP(MaquinaVirtual *mv, operando *op);
+void PUSH(MaquinaVirtual *mv, operando *op);
+void POP(MaquinaVirtual *mv, operando *op);
+void CALL(MaquinaVirtual *mv, operando *op);
+void RET(MaquinaVirtual *mv, operando *op);
 
 //funciones de la llamada sys
 void readSys(MaquinaVirtual *mv,Sistema aux);
 void writeSys(MaquinaVirtual *mv,Sistema aux);
+void readStringSys(MaquinaVirtual *mv,Sistema aux);
+void writeStringSys(MaquinaVirtual *mv,Sistema aux);
+void clearScreen(MaquinaVirtual *mv,Sistema aux);
+void breakPoint(MaquinaVirtual *mv,Sistema aux);
 
 
 //DISASSEMBLER
@@ -136,6 +152,10 @@ void imprimeLDH(InstruccionDisassembler disInstruccion);
 void imprimeRND(InstruccionDisassembler disInstruccion);
 void imprimeNOT(InstruccionDisassembler disInstruccion);
 void imprimeSTOP(InstruccionDisassembler disInstruccion);
+void imprimePUSH(InstruccionDisassembler disInstruccion);
+void imprimePOP(InstruccionDisassembler disInstruccion);
+void imprimeCALL(InstruccionDisassembler disInstruccion);
+void imprimeRET(InstruccionDisassembler disInstruccion);
 
 
 void obtieneTAG(char reg,char segmento,char nombre[]);

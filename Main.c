@@ -3,36 +3,45 @@
 #include<string.h>
 #include"maquina_virtual.h"
 
-int main(int argc, char const *argv[])
+// vmx.exe [filename.vmx] [filename.vmi] [m=M] [-d]
+int main(int argc, char *argv[])
 {
-    int falloArch = 0;
     MaquinaVirtual mv;
-    char *extension;
+    int entraDisassembler = 0;
+    int entraCarga = 0;
+    unsigned int aux;
 
-    //verificar argumentos
-    if( argc < 2 || argc > 3){ 
-        return EXIT_FAILURE;
-    } 
-    // Obtener la extensión del archivo proporcionado
-    extension = strrchr(argv[1], '.');
-    //strcpy(arch,argv[1]);
-    // Verificar que la extensión sea .vmx
-    if ( (extension == NULL) || (strcmp(extension, ".vmx") != 0) ) {
-        fprintf(stderr, "Error: El archivo debe tener la extensión .vmx\n");
-        return EXIT_FAILURE;
-    } else {
-        //carga el contenido del archivo en el segmento de datos
-        cargaMV(&mv,argv[1], &falloArch);
-        if ( falloArch ) {
-            perror("Error al abrir el archivo");
-            return EXIT_FAILURE;
+    //validacion de argumentos opcionales
+    for ( int i = 1; i < argc; i++) 
+    {
+        int len = strlen(argv[i]);
+
+        //verificar  [filename.vmx]
+        if (len >= 4 && strcmp(argv[i] + len - 4, ".vmx") == 0) {
+            entraCarga++;
+        }
+
+        //verificar [filename.vmi]
+        if (len >= 4 && strcmp(argv[i] + len - 4, ".vmi") == 0) {
+            strcpy(mv.imagenArchivo,argv[i]);
+            printf("%s",mv.imagenArchivo);
+        }
+        
+        // Verificar [m=M]
+        if (sscanf(argv[i],"m=%d",&aux)) {
+            printf("m=M: %s\n", argv[i]);
+
+        }
+
+        // Verificar [-d]
+        if (strcmp(argv[i], "-d") == 0) {
+            entraDisassembler = 1;
         }
     }
-    //verificar el argumento "-d" para el modo debug
-    if ( argc == 3 && strcmp(argv[1],"-d") == 0 ) {
-       disassembler(&mv);
-    }
-    ejecutarMV(&mv);
-
+    //printf("%d",entraDisassembler);
+    //carga 
+    //ejecucion
+    //disassembler
+    gets("Fin");
     return EXIT_SUCCESS;
 }
