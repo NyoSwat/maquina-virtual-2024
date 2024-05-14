@@ -47,16 +47,19 @@ typedef struct {
 }Error;
 
 // Funciones para operar el flujo de la máquina virtual
-void cargaMV(MaquinaVirtual *mv, char *[], int*);
+void cargaMV(MaquinaVirtual *mv, char *[], int *numInstrucciones, unsigned int memoria , int *version);
 void disassembler(MaquinaVirtual *mv);
 void ejecutarMV(MaquinaVirtual *mv, int version, int numInstrucciones);
 
 //funciones modularizadas para las funciones de la maquina
-int corrigeRango(int rango);
+int corrigeSize(int rango);
 void LeerByte(char instruccion, char *op1, char *op2, unsigned int *operacion);
 void sumaIP(int *ip,char operando1,char operando2);
 void InformaError(MaquinaVirtual *mv, Error error);
 void ejecutaCiclo(MaquinaVirtual *mv, char version, int ip);
+
+//creacion de archivo de imagen vmi
+void creaArchivoDeImagen(MaquinaVirtual mv);
 
 //funciones para emplear los operandos de las operaciones del lenguaje assembler
 int getReg(MaquinaVirtual *mv, operando op);

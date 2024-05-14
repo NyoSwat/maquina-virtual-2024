@@ -7,8 +7,11 @@
 int main(int argc, char *argv[])
 {
     MaquinaVirtual mv;
+    int numInstrucciones = 0;
     int entraDisassembler = 0;
+    int version;
     int entraCarga = 0;
+    int memoriaParam;
     unsigned int aux;
 
     //validacion de argumentos opcionales
@@ -30,7 +33,8 @@ int main(int argc, char *argv[])
         // Verificar [m=M]
         if (sscanf(argv[i],"m=%d",&aux)) {
             printf("m=M: %s\n", argv[i]);
-
+            
+            memoriaParam = (int) argv[i];
         }
 
         // Verificar [-d]
@@ -38,10 +42,14 @@ int main(int argc, char *argv[])
             entraDisassembler = 1;
         }
     }
-    //printf("%d",entraDisassembler);
-    //carga 
-    //ejecucion
-    //disassembler
+    printf("%d",entraDisassembler);
+
+    cargaMV(&mv,argv,&numInstrucciones,memoriaParam,&version);
+
+    ejecutarMV(&mv,version,numInstrucciones);
+
+    if ( entraDisassembler ) disassembler(&mv);
+    
     gets("Fin");
     return EXIT_SUCCESS;
 }
