@@ -29,7 +29,7 @@ void asignaSegmento( MaquinaVirtual *mv, int segmento )
     }
 }
 
-void cargaMV(MaquinaVirtual *mv, char* argv[], int *numInstrucciones, unsigned int memoria , int *version)
+void cargaMV(MaquinaVirtual *mv, char* argv[], int *numInstrucciones, unsigned int memoria , char *version)
 {
     char *header = (char*)malloc(6*sizeof(char));
     unsigned short int *arrTamSegmentos, size = 0, sizeAnt = 0; 
@@ -46,7 +46,7 @@ void cargaMV(MaquinaVirtual *mv, char* argv[], int *numInstrucciones, unsigned i
         } else {
 
             //Tras verificar el encabezado, verifico la version de trabajo
-            fread(&version,sizeof(char),1,arch);
+            fread(version,sizeof(char),1,arch);
             
             //inicializacion de segmentos
             if ( version == 1) 
