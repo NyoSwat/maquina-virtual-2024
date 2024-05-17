@@ -4,6 +4,10 @@
 #include<string.h>
 #include"maquina_virtual.h"
 
+//retorna posicion del segmento contenido en los bytes del registro
+int Pos_Seg(MaquinaVirtual *mv, int segment) {
+    return mv->registros[segment] >> 16;
+}
 
 int corrigeSize(int size) 
 {
@@ -13,25 +17,21 @@ int corrigeSize(int size)
     return aux2 | aux1;
 }
 
-void loadSYSOperationArray(funcionSys *vecLlamadas)
+void asignaSegmento( MaquinaVirtual *mv, int segmento )
 {
-    vecLlamadas[0x1] = readSys;
-    vecLlamadas[0x2] = writeSys;
-    vecLlamadas[0x3] = readStringSys;
-    vecLlamadas[0x4] = writeStringSys;
-    vecLlamadas[0x7] = clearScreen;
-    vecLlamadas[0xF] = breakPoint;
-}
+    int cantSegmentos = 0, tamSegmento;
 
-//retorna posicion del segmento contenido en los bytes del registro
-int PosSegmento(MaquinaVirtual mv, int segment) {
-    return mv.registros[segment] >> 16;
+    if ( tamSegmento > 0 ) {
+        mv->registros[segmento] = 
+    } else {
+        mv->registros[ES] = 0x00000000 | cantSegmentos;
+        
+    }
 }
 
 void cargaMV(MaquinaVirtual *mv, char* argv[], int *numInstrucciones, unsigned int memoria , int *version)
 {
     char *header = (char*)malloc(6*sizeof(char));
-    char version;
     unsigned short int *arrTamSegmentos, size = 0, sizeAnt = 0; 
     int i, cont, contSegmentos = 0, totalSize = 0;
     unsigned short int offset;
@@ -59,7 +59,7 @@ void cargaMV(MaquinaVirtual *mv, char* argv[], int *numInstrucciones, unsigned i
 
                 mv->segmentos[DS].base = ( mv->segmentos[CS].size + 1);
                 mv->segmentos[DS].size = ( NUM_MEMORIA - mv->segmentos[CS].size );
-                mv->registros[DS] = 0x0001;
+                mv->registros[DS] = 0x00000000 | mv->segmentos[DS].base;
 
             } else if ( version == 2 ) {
 
@@ -89,7 +89,7 @@ void cargaMV(MaquinaVirtual *mv, char* argv[], int *numInstrucciones, unsigned i
                 }
 
                 //designo el CS
-                mv->registros[CS] = contSegmentos;
+                mv->registros[CS] = 0x00000000 | contSegmentos;
                 mv->segmentos[mv->registros[CS]].base = sizeAnt + 1;
                 mv->segmentos[mv->registros[CS]].size = arrTamSegmentos[CS];
                 sizeAnt = mv->segmentos[mv->registros[CS]].size;
@@ -98,7 +98,7 @@ void cargaMV(MaquinaVirtual *mv, char* argv[], int *numInstrucciones, unsigned i
 
                 //designo el DS
                 if ( arrTamSegmentos[DS] > 0 ) {
-                    mv->registros[DS] = contSegmentos;
+                    mv->registros[DS] = 0x00000000 | contSegmentos;
                     mv->segmentos[mv->registros[DS]].base = sizeAnt + 1;
                     mv->segmentos[mv->registros[DS]].size = arrTamSegmentos[DS];
                     sizeAnt = mv->segmentos[mv->registros[DS]].size;
@@ -110,7 +110,7 @@ void cargaMV(MaquinaVirtual *mv, char* argv[], int *numInstrucciones, unsigned i
 
                 //designo el ES
                 if ( arrTamSegmentos[ES] > 0 ) {
-                    mv->registros[ES] = contSegmentos;
+                    mv->registros[ES] = 0x00000000 | contSegmentos;
                     mv->segmentos[mv->registros[ES]].base = sizeAnt + 1;
                     mv->segmentos[mv->registros[ES]].size = arrTamSegmentos[ES];
                     sizeAnt = mv->segmentos[mv->registros[ES]].size;
@@ -122,7 +122,7 @@ void cargaMV(MaquinaVirtual *mv, char* argv[], int *numInstrucciones, unsigned i
 
                 //designo el SS
                 if ( arrTamSegmentos[SS] > 0 ) {
-                    mv->registros[SS] = contSegmentos;
+                    mv->registros[SS] = 0x00000000 | contSegmentos;
                     mv->segmentos[mv->registros[SS]].base = sizeAnt + 1;
                     mv->segmentos[mv->registros[SS]].size = arrTamSegmentos[SS];
                     mv->registros[BP] = mv->segmentos[mv->registros[SS]].base;
@@ -164,7 +164,7 @@ void cargaMV(MaquinaVirtual *mv, char* argv[], int *numInstrucciones, unsigned i
             if (version >  1) *numInstrucciones = cont;
         }
     }
-    mv->registros[IP] = 0;
+    mv->registros[IP] = Pos_Seg(mv,CS);
     fclose(arch);
 }
 
@@ -304,7 +304,7 @@ void InformaError(MaquinaVirtual *mv, Error error){
     mv->registros[IP] = mv->segmentos[CS].size;
 }
 
-void ejecutaCiclo(MaquinaVirtual *mv, int version, int ip)
+void ejecutaCiclo(MaquinaVirtual *mv, int version)
 {
     unsigned int operacion, ok;
     char auxbyte,auxmem;
@@ -314,18 +314,10 @@ void ejecutaCiclo(MaquinaVirtual *mv, int version, int ip)
 
     cargaVF(arrFunciones);
         
-    LeerByte(mv->Memoria[ip],&(op[0].tipo),&(op[1].tipo),&operacion);
-    
-    sumaIP(&(mv->registros[IP]),op[0].tipo,op[1].tipo);
+    LeerByte(mv->Memoria[mv->registros[IP]],&(op[0].tipo),&(op[1].tipo),&operacion);
 
-    recuperaOperandos(mv,op,ip);
+    recuperaOperandos(mv,op,mv->registros[IP]);
 
-    /*printf("operacion %02x\n",operacion);
-    printf("tipo op1 %02x\n",op[0].tipo);
-    printf("tipo op2 %02x\n",op[1].tipo);
-
-    printf(" op1 %d\n",op[0].registro);
-    printf(" op2 %d\n",op[1].registro);*/
     switch (version) {
         case 1: ok = (operacion >= 0 && operacion <= 0x0C) || (operacion >= 0x10 && operacion <= 0x1A) || (operacion == 0x1F);
             break;
@@ -342,16 +334,15 @@ void ejecutaCiclo(MaquinaVirtual *mv, int version, int ip)
 
 void ejecutarMV(MaquinaVirtual *mv, int version, int numInstrucciones) 
 {
-    int ipAux = mv->segmentos[mv->registros[CS]].base;
 
     switch (version) {
     case 1:
         while(mv->registros[IP] < mv->segmentos[mv->registros[CS]].size)
-            ejecutaCicloProcesador(&mv,version,ipAux);
+            ejecutaCicloProcesador(&mv,version);
         break;
     case 2:
         while(mv->registros[IP] < mv->segmentos[mv->registros[CS]].size || mv->registros[IP] < numInstrucciones)
-            ejecutaCicloProcesador(&mv,version,ipAux);
+            ejecutaCicloProcesador(&mv,version);
         break;
     }
 }
@@ -583,6 +574,8 @@ void imprimeOperando(operando op){
     }
 }
 
+//OPERACIONES DEL LENGUAGE 
+
 //funcion de asignacion al Condition Code
 void setCC(MaquinaVirtual *mv, int n){
     if ( n > 0 )
@@ -745,7 +738,7 @@ void PUSH(MaquinaVirtual *mv, operando *op)
     //printf("PUSH\n");
     mv->registros[SP] -= 4;
     short int puntero = mv->registros[SP] & 0x0000FFFF;
-    if(mv->registros[6] < mv->registros[4]) {
+    if(mv->registros[SP] < mv->registros[PosSegmento(mv,SS)]) {
         printf("ERROR: STACK OVERFLOW\n");
         STOP(mv,op);
     } else {
@@ -826,6 +819,18 @@ void RET(MaquinaVirtual *mv, operando *op)
         mv->registros[5] += 3;
 //        printf("IP RET: %04X\n",mv->registros[IP]);
     }
+}
+
+//FUNCIONES DEL SISTEMA
+
+void loadSYSOperationArray(funcionSys *vecLlamadas)
+{
+    vecLlamadas[0x1] = readSys;
+    vecLlamadas[0x2] = writeSys;
+    vecLlamadas[0x3] = readStringSys;
+    vecLlamadas[0x4] = writeStringSys;
+    vecLlamadas[0x7] = clearScreen;
+    vecLlamadas[0xF] = breakPoint;
 }
 
 void readSys(MaquinaVirtual *mv,Sistema aux) {
@@ -982,7 +987,17 @@ void clearScreen(MaquinaVirtual *mv,Sistema aux)
 
 void breakPoint(MaquinaVirtual *mv,Sistema aux)
 {
-    
+    char key;
+
+    if ( mv->imagenArchivo != NULL ) {
+        do {
+            creaArchivoDeImagen(*mv);
+            scanf("%c\n",&key);
+            if ( key == 13) {
+                ejecutaCiclo(mv,mv->header[5]);
+            } 
+        } while ( key != 113 ); //para con el ingreso de la letra q
+    }
 }
 
 //DISASSEMBLER
