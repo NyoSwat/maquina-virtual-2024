@@ -13,15 +13,20 @@
 #define CC 8
 #define AC 9
 
+/*
+typedef struct {
+    char header[8];
+    char imagenArchivo[16];
+}imagen;*/
 
 //estructura del procesador de la maquina virtual
 typedef struct {
-    char header[8];
     char *Memoria;  
     int  registros[NUM_REGISTROS];    
     struct segmentos{
-       short int base,size;
+       unsigned short int base,size;
     }segmentos[NUM_TABLA_SEGMENTOS];
+    char header[8];
     char imagenArchivo[16];
 } MaquinaVirtual;
 
@@ -46,19 +51,9 @@ typedef struct {
     int code,invalidInstruction;
 }Error;
 
-// Funciones para operar el flujo de la máquina virtual
-
-//inicializa la maquina virtual
-void cargaMV(MaquinaVirtual *mv, char *[], int *numInstrucciones, unsigned int memoria , char *version);
-//muestra el codigo assembler ingresado por archivo
-void disassembler(MaquinaVirtual *mv);
-//ejecucion del segmento de codigo
-void ejecutarMV(MaquinaVirtual *mv, int version, int numInstrucciones);
-
 //funciones modularizadas para las funciones de la maquina
 int Pos_Seg(MaquinaVirtual *mv, int segment);
 int corrigeSize(int rango);
-void asignaSegmento( MaquinaVirtual *mv, int segmento );
 void LeerByte(char instruccion, char *op1, char *op2, unsigned int *operacion);
 void sumaIP(int *ip,char operando1,char operando2);
 void InformaError(MaquinaVirtual *mv, Error error);

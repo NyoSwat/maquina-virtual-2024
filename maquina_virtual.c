@@ -5,8 +5,8 @@
 #include"maquina_virtual.h"
 
 //retorna posicion del segmento contenido en los bytes del registro
-int Pos_Seg(MaquinaVirtual *mv, int segment) {
-    return mv->registros[segment] >> 16;
+ int Pos_Seg(MaquinaVirtual *mv, int segment) {
+    return (mv->registros[segment] >> 16);
 }
 
 int corrigeSize(int size) 
@@ -17,156 +17,6 @@ int corrigeSize(int size)
     return aux2 | aux1;
 }
 
-void asignaSegmento( MaquinaVirtual *mv, int segmento )
-{
-    int cantSegmentos = 0, tamSegmento;
-
-    if ( tamSegmento > 0 ) {
-        mv->registros[segmento] = 
-    } else {
-        mv->registros[ES] = 0x00000000 | cantSegmentos;
-        
-    }
-}
-
-void cargaMV(MaquinaVirtual *mv, char* argv[], int *numInstrucciones, unsigned int memoria , char *version)
-{
-    char *header = (char*)malloc(6*sizeof(char));
-    unsigned short int *arrTamSegmentos, size = 0, sizeAnt = 0; 
-    int i, cont, contSegmentos = 0, totalSize = 0;
-    unsigned short int offset;
-    FILE *arch = fopen(argv[1],"rb");
-
-    if( arch != NULL ) 
-    {
-        //comienza el proceso del archivo .vmx
-        fgets(header, 6 * sizeof(char),arch); //obtentiene nombre del header
-        if(strcmp(header,"VMX24") ) {
-            printf("error de extensión");
-        } else {
-
-            //Tras verificar el encabezado, verifico la version de trabajo
-            fread(version,sizeof(char),1,arch);
-            
-            //inicializacion de segmentos
-            if ( version == 1) 
-            {
-                fread(&size,sizeof(unsigned short int),1,arch);
-                size = corrigeSize(size);
-                mv->segmentos[CS].base = 0x0000;
-                mv->segmentos[CS].size = size;
-                mv->registros[CS] = 0;
-
-                mv->segmentos[DS].base = ( mv->segmentos[CS].size + 1);
-                mv->segmentos[DS].size = ( NUM_MEMORIA - mv->segmentos[CS].size );
-                mv->registros[DS] = 0x00000000 | mv->segmentos[DS].base;
-
-            } else if ( version == 2 ) {
-
-                //trabajo los segmentos de memoria
-                for(int j = 0; j < 5; j++) {
-                    fread(&size, sizeof(unsigned short int), 1, arch);
-                    arrTamSegmentos[j] = size;
-                    arrTamSegmentos[j] = corrigeSize(arrTamSegmentos[j]); 
-                } 
-                //Carga el header y el nombre del archivo .vmi;
-                for(i=0;i<5;i++) {
-                    mv->header[i] = header[i];
-                }
-                mv->header[6] = (char) size >> 8;
-                mv->header[7] = (char) size;
-
-                //designo el KS
-                if ( arrTamSegmentos[KS] > 0 ) {
-                    mv->registros[KS] = 0x0000;
-                    mv->segmentos[mv->registros[KS]].base = 0;
-                    mv->segmentos[mv->registros[KS]].size = arrTamSegmentos[KS];
-                    contSegmentos++;
-                    sizeAnt = mv->segmentos[mv->registros[KS]].size;
-                    totalSize += sizeAnt;
-                } else {
-                    mv->registros[KS] = -1;
-                }
-
-                //designo el CS
-                mv->registros[CS] = 0x00000000 | contSegmentos;
-                mv->segmentos[mv->registros[CS]].base = sizeAnt + 1;
-                mv->segmentos[mv->registros[CS]].size = arrTamSegmentos[CS];
-                sizeAnt = mv->segmentos[mv->registros[CS]].size;
-                totalSize += sizeAnt;
-                contSegmentos++;
-
-                //designo el DS
-                if ( arrTamSegmentos[DS] > 0 ) {
-                    mv->registros[DS] = 0x00000000 | contSegmentos;
-                    mv->segmentos[mv->registros[DS]].base = sizeAnt + 1;
-                    mv->segmentos[mv->registros[DS]].size = arrTamSegmentos[DS];
-                    sizeAnt = mv->segmentos[mv->registros[DS]].size;
-                    totalSize += sizeAnt;
-                    contSegmentos++;
-                } else {
-                    mv->registros[DS] = -1;
-                }
-
-                //designo el ES
-                if ( arrTamSegmentos[ES] > 0 ) {
-                    mv->registros[ES] = 0x00000000 | contSegmentos;
-                    mv->segmentos[mv->registros[ES]].base = sizeAnt + 1;
-                    mv->segmentos[mv->registros[ES]].size = arrTamSegmentos[ES];
-                    sizeAnt = mv->segmentos[mv->registros[ES]].size;
-                    totalSize += sizeAnt;
-                    contSegmentos++;
-                } else {
-                    mv->registros[ES] = -1;
-                }
-
-                //designo el SS
-                if ( arrTamSegmentos[SS] > 0 ) {
-                    mv->registros[SS] = 0x00000000 | contSegmentos;
-                    mv->segmentos[mv->registros[SS]].base = sizeAnt + 1;
-                    mv->segmentos[mv->registros[SS]].size = arrTamSegmentos[SS];
-                    mv->registros[BP] = mv->segmentos[mv->registros[SS]].base;
-                    mv->registros[SP] = mv->segmentos[mv->registros[SS]].size;
-                    totalSize += sizeAnt;
-                    contSegmentos++;
-                } else {
-                    mv->registros[SS] = -1;
-                }
-
-                //validacion del tamaño de memoria
-                if ( memoria > 0 && memoria < totalSize ) {
-                    printf( "\nERROR: MEMORIA INSUFICIENTE\n");
-                    exit(EXIT_FAILURE);
-                } else {
-                    if ( memoria > 0 ) {
-                        mv->Memoria = (char *) malloc( sizeof(char) * memoria );
-                    } else {
-                        mv->Memoria = (char *) malloc( sizeof(char) * NUM_MEMORIA);
-                    }
-                }
-
-                fread(&offset, sizeof(unsigned short int), 1, arch);
-                
-            } else {
-                printf(" error de version ");
-                exit(EXIT_FAILURE);
-            } 
-            //bloque de lectura del binario para cargarlo en Memoria
-            cont = 0;
-            while (fread(&mv->Memoria[cont],sizeof(char),1,arch))
-            {
-                if (cont >= mv->segmentos[0].size) {
-                    mv->segmentos[1].size += 1;
-                }
-                printf("%s ",mv->Memoria[cont]);//
-                cont++;
-            } 
-            if (version >  1) *numInstrucciones = cont;
-        }
-    }
-    mv->registros[IP] = Pos_Seg(mv,CS);
-    fclose(arch);
-}
 
 void cargaVF(Toperaciones *v){
     //2 operandos
@@ -221,26 +71,26 @@ void LeerByte(char instruccion, char *operando1, char *operando2, unsigned int *
 }
 
 //recupera los operandos a partir de los datos en Memoria
-void recuperaOperandos(MaquinaVirtual *mv,operando *o,int ip)
+void recuperaOperandos(MaquinaVirtual *mv,operando *op,int ip)
 {
     char aux;
     int auxInt;
     for (int i = 0; i++; i<2) 
     {
         auxInt = 0;
-        switch(o[i].tipo) {
+        switch(op[i].tipo) {
 
             case 0x00: //tipo Memoria
                 aux = mv->Memoria[++ip];  //leo en un auxiliar el byte que dice el registro en el que se va a almacenar
-                o[i].segmentoReg = (aux >> 6) & 0x03;
+                op[i].segmentoReg = (aux >> 6) & 0x03;
                 aux = aux & 0x0F;
-                o[i].registro = (int)aux;
+                op[i].registro = (int)aux;
                 //printf("registro t mem op 1 %d\n",aux);
 
                 auxInt |= mv->Memoria[++ip] << 8; //leo en un int auxiliar los 2 bytes que representan el desplazamiento de bytes
                 auxInt |= (mv->Memoria[++ip] & 0x000000FF);
 
-                o[i].desplazamiento = auxInt;
+                op[i].desplazamiento = auxInt;
                 //printf("desplazamiento t mem op 1 %d\n",aux);
                 break;
 
@@ -249,17 +99,17 @@ void recuperaOperandos(MaquinaVirtual *mv,operando *o,int ip)
                 //printf("set inm %04X\n",auxInt);
                 auxInt |= (mv->Memoria[++ip] & 0x00FF);
                 //printf("set inm %04X\n",auxInt);
-                o[i].desplazamiento = auxInt;
+                op[i].desplazamiento = auxInt;
                 break;
 
             case 0x02: //tipo registro
                 aux = mv->Memoria[++ip];  //leo en un auxiliar el byte que dice el registro que voy a usar
                 aux = aux & 0x0F;
-                o[i].registro = aux;
+                op[i].registro = aux;
                 //printf("registro op %d\n",aux);
                 aux = mv->Memoria[ip]; //leo en un auxiliar el byte y saco el segmento de registro
                 aux = aux >> 4;
-                o[i].segmentoReg = aux & 0x03;
+                op[i].segmentoReg = aux & 0x03;
                 //printf("segmento t reg op 1 %d\n",aux);
                 break;
         }
@@ -332,71 +182,6 @@ void ejecutaCiclo(MaquinaVirtual *mv, int version)
     }
 }
 
-void ejecutarMV(MaquinaVirtual *mv, int version, int numInstrucciones) 
-{
-
-    switch (version) {
-    case 1:
-        while(mv->registros[IP] < mv->segmentos[mv->registros[CS]].size)
-            ejecutaCicloProcesador(&mv,version);
-        break;
-    case 2:
-        while(mv->registros[IP] < mv->segmentos[mv->registros[CS]].size || mv->registros[IP] < numInstrucciones)
-            ejecutaCicloProcesador(&mv,version);
-        break;
-    }
-}
-
-void disassembler(MaquinaVirtual *mv)
-{
-    int i = 0;
-    int ipAssembler = 0;
-    operando operandos[2];
-    funcionDisassembler imprimeFuncion[0xF2];
-    InstruccionDisassembler vecDisassembler[NUM_MEMORIA];
-    unsigned int operacion;
-    printf("\n-------------\n\nDisassembler: \n\n------------\n");
-    while(ipAssembler < mv->segmentos[mv->registros[CS]].size) 
-    {
-        LeerByte(mv->Memoria[ipAssembler],&(operandos[0].tipo),&(operandos[1].tipo),&operacion);
-
-        vecDisassembler[i].operandos->tipo = operandos[0].tipo;
-        vecDisassembler[i].operandos->tipo = operandos[1].tipo;
-
-        vecDisassembler->ipInicio = ipAssembler;
-        vecDisassembler->codigoOperacion = operacion;
-
-        recuperaOperandos(mv,operandos,ipAssembler);
-
-        vecDisassembler[i].operandos[0] = operandos[0];
-        vecDisassembler[i].operandos[1] = operandos[1];
-
-        sumaIP(&(ipAssembler),operandos[0].tipo,operandos[1].tipo);
-
-        vecDisassembler[i].ipFinal = ipAssembler;
-
-        i++;
-    }
-
-    cargaVectorDisassembler(imprimeFuncion);
-    vecDisassembler[0].ipInicio = 0;
-
-    for(int z = 0;z < i;z++){
-        printf("[%04X] ",vecDisassembler[z].ipInicio);
-        for(int ip = vecDisassembler[z].ipInicio; ip < vecDisassembler[z].ipFinal ;ip++){
-           printf("%02X ",mv->Memoria[ip] & 0xFF);
-        }
-
-        printf("\t\t|\t");
-        operacion = vecDisassembler[z].codigoOperacion;
-        if((operacion >= 0 && operacion < 12) || (operacion >= 0x30 && operacion < 0x3F) || (operacion >= 0xF0 && operacion < 0xF2)){
-            imprimeFuncion[vecDisassembler[z].codigoOperacion](vecDisassembler[z]);
-        }
-
-        printf("\n");
-    }
-
-}
 
 void creaArchivoDeImagen(MaquinaVirtual mv) 
 {
@@ -427,7 +212,8 @@ void creaArchivoDeImagen(MaquinaVirtual mv)
     fclose(archImagen);
 }
 
-int getReg(MaquinaVirtual *mv, operando op){
+int getReg(MaquinaVirtual *mv, operando op)
+{
     int n;
 
     if ( op.segmentoReg == 0x00 )  // extended
@@ -729,7 +515,7 @@ void NOT(MaquinaVirtual *mv, operando *op){
 }
 
 void STOP(MaquinaVirtual *mv, operando *op){
-    mv->registros[IP] = mv->segmentos[0].size; 
+    mv->registros[IP] = mv->segmentos[Pos_Seg(mv,CS)].size; 
 }
 
 void PUSH(MaquinaVirtual *mv, operando *op)
@@ -738,7 +524,7 @@ void PUSH(MaquinaVirtual *mv, operando *op)
     //printf("PUSH\n");
     mv->registros[SP] -= 4;
     short int puntero = mv->registros[SP] & 0x0000FFFF;
-    if(mv->registros[SP] < mv->registros[PosSegmento(mv,SS)]) {
+    if(mv->registros[SP] < mv->registros[Pos_Seg(mv,SS)]) {
         printf("ERROR: STACK OVERFLOW\n");
         STOP(mv,op);
     } else {
@@ -777,8 +563,8 @@ void CALL(MaquinaVirtual *mv, operando *op)
     int aux;
 //    printf("CALL %02X\n",getOp(mv,op[0]));
     mv->registros[6] -= 4;
-    short int puntero = mv->registros[6] & 0x0000FFFF;
-    if(mv->registros[SP] < mv->registros[SS]){
+    short int puntero = mv->registros[SP] & 0x0000FFFF;
+    if(mv->registros[SP] < mv->registros[SS]) {
         printf("ERROR: STACK OVERFLOW\n");
         STOP(mv,op);
     }else{
@@ -786,14 +572,14 @@ void CALL(MaquinaVirtual *mv, operando *op)
 
         aux = mv->registros[IP];
 
-        mv->Memoria[mv->segmentos[SS].base + puntero + 3] = (aux & 0x000000FF);
-        mv->Memoria[mv->segmentos[SS].base + puntero + 2] = (aux & 0x0000FF00)>>8;
-        mv->Memoria[mv->segmentos[SS].base + puntero + 1] = (aux & 0x00FF0000)>>16;
-        mv->Memoria[mv->segmentos[SS].base + puntero] = (aux & 0xFF000000)>>24;
+        mv->Memoria[mv->registros[SP] + puntero + 3] = (aux & 0x000000FF);
+        mv->Memoria[mv->registros[SP] + puntero + 2] = (aux & 0x0000FF00)>>8;
+        mv->Memoria[mv->registros[SP] + puntero + 1] = (aux & 0x00FF0000)>>16;
+        mv->Memoria[mv->registros[SP] + puntero] = (aux & 0xFF000000)>>24;
 
         //printf("Va a entrar al JMP\n");
 
-        mv->registros[5] = getOp(mv,op[0]);
+        mv->registros[IP] = getOp(mv,op[0]);
     }
 }
 
@@ -803,7 +589,7 @@ void RET(MaquinaVirtual *mv, operando *op)
     short int puntero = mv->registros[6] & 0x0000FFFF;
 
     //printf("RET\n ");
-    if(mv->segmentos[mv->registros[SS]].size < puntero){
+    if(mv->segmentos[Pos_Seg(mv,SS)].size < puntero){
         printf("ERROR: STACK UNDERFLOW\n");
         STOP(mv,op);
     }else{
@@ -813,10 +599,10 @@ void RET(MaquinaVirtual *mv, operando *op)
         aux |= (0x0000FF00 & (mv->Memoria[mv->segmentos[SS].base + puntero + 2] << 8));
         aux |= (0x000000FF & (mv->Memoria[mv->segmentos[SS].base + puntero + 3]));
 
-        mv->registros[5] = 0x0000FFFF & aux;
+        mv->registros[IP] = 0x0000FFFF & aux;
 
-        mv->registros[6] += 4;
-        mv->registros[5] += 3;
+        mv->registros[SP] += 4;
+        mv->registros[IP] += 3;
 //        printf("IP RET: %04X\n",mv->registros[IP]);
     }
 }
