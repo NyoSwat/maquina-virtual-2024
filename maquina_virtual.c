@@ -9,7 +9,7 @@
     return (mv->registros[segment] >> 16);
 }
 
-int corrigeSize(int size) 
+int corrigeSize(int size)
 {
     int aux1 = 0, aux2 = 0;
     aux1 = (size >> 8) & 0x00FF;
@@ -37,21 +37,18 @@ void cargaVF(Toperaciones *v){
     v[0x1B] = PUSH; v[0x1C] = POP;
     v[0x1A] = CALL;
     //0 operandos
-    v[0x1E] = RET; v[0x1F] = STOP; 
+    v[0x1E] = RET; v[0x1F] = STOP;
 }
 
 //primer byte de la sentencia de 4
-void LeerByte(char instruccion, char *operando1, char *operando2, unsigned int *operacion) 
+void LeerByte(char instruccion, char *operando1, char *operando2, unsigned int *operacion)
 {
-     if((instruccion & 0xF0) == 0xF0)
+     if((instruccion & 0x1F) == 0x1F)
      {
         if((instruccion & 0x03) == 0x00)
-            *operacion = 0xF0;
+            *operacion = 0x1F;
         else{
-            if((instruccion & 0x03) == 0x01)
-                *operacion = 0xF1;
-            else
-                *operacion = 0xF3;
+            *operacion = 0x1E;
         }
         *operando2 = 0x3;
         *operando1 = 0x3;
@@ -70,51 +67,7 @@ void LeerByte(char instruccion, char *operando1, char *operando2, unsigned int *
     }
 }
 
-//recupera los operandos a partir de los datos en Memoria
-void recuperaOperandos(MaquinaVirtual *mv,operando *op,int ip)
-{
-    char aux;
-    int auxInt;
-    for (int i = 0; i++; i<2) 
-    {
-        auxInt = 0;
-        switch(op[i].tipo) {
 
-            case 0x00: //tipo Memoria
-                aux = mv->Memoria[++ip];  //leo en un auxiliar el byte que dice el registro en el que se va a almacenar
-                op[i].segmentoReg = (aux >> 6) & 0x03;
-                aux = aux & 0x0F;
-                op[i].registro = (int)aux;
-                //printf("registro t mem op 1 %d\n",aux);
-
-                auxInt |= mv->Memoria[++ip] << 8; //leo en un int auxiliar los 2 bytes que representan el desplazamiento de bytes
-                auxInt |= (mv->Memoria[++ip] & 0x000000FF);
-
-                op[i].desplazamiento = auxInt;
-                //printf("desplazamiento t mem op 1 %d\n",aux);
-                break;
-
-            case 0x01: //tipo inmediato
-                auxInt |= mv->Memoria[++ip] << 8; //leo en un int auxiliar los 2 bytes que representan el numero inmediato
-                //printf("set inm %04X\n",auxInt);
-                auxInt |= (mv->Memoria[++ip] & 0x00FF);
-                //printf("set inm %04X\n",auxInt);
-                op[i].desplazamiento = auxInt;
-                break;
-
-            case 0x02: //tipo registro
-                aux = mv->Memoria[++ip];  //leo en un auxiliar el byte que dice el registro que voy a usar
-                aux = aux & 0x0F;
-                op[i].registro = aux;
-                //printf("registro op %d\n",aux);
-                aux = mv->Memoria[ip]; //leo en un auxiliar el byte y saco el segmento de registro
-                aux = aux >> 4;
-                op[i].segmentoReg = aux & 0x03;
-                //printf("segmento t reg op 1 %d\n",aux);
-                break;
-        }
-    }
-}
 
 //aumenta la posicion del registro ip en funciona de la cantidad de bytes usadas por los operandos
 void sumaIP(int *ip,char operando1,char operando2){
@@ -157,14 +110,15 @@ void InformaError(MaquinaVirtual *mv, Error error){
 void ejecutaCiclo(MaquinaVirtual *mv, int version)
 {
     unsigned int operacion, ok;
-    char auxbyte,auxmem;
     operando op[2];
     Toperaciones arrFunciones[256];
     Error error;
 
     cargaVF(arrFunciones);
-        
+
     LeerByte(mv->Memoria[mv->registros[IP]],&(op[0].tipo),&(op[1].tipo),&operacion);
+
+    sumaIP(&(mv->registros[IP]), op[0].tipo, op[1].tipo);
 
     recuperaOperandos(mv,op,mv->registros[IP]);
 
@@ -172,8 +126,8 @@ void ejecutaCiclo(MaquinaVirtual *mv, int version)
         case 1: ok = (operacion >= 0 && operacion <= 0x0C) || (operacion >= 0x10 && operacion <= 0x1A) || (operacion == 0x1F);
             break;
         case 2: ok = (operacion >= 0 && operacion <= 0x0C) || (operacion >= 0x10 && operacion <= 0x1F);
-    }   
-    if (ok) 
+    }
+    if (ok)
         arrFunciones[operacion](mv,op);
     else {
         error.code = 0;
@@ -183,7 +137,7 @@ void ejecutaCiclo(MaquinaVirtual *mv, int version)
 }
 
 
-void creaArchivoDeImagen(MaquinaVirtual mv) 
+void creaArchivoDeImagen(MaquinaVirtual mv)
 {
     FILE *archImagen;
     unsigned short int i, tamanio = ( mv.header[6] << 8 | mv.header[7] );
@@ -212,6 +166,52 @@ void creaArchivoDeImagen(MaquinaVirtual mv)
     fclose(archImagen);
 }
 
+//recupera los operandos a partir de los datos en Memoria
+void recuperaOperandos(MaquinaVirtual *mv,operando *op,int ip)
+{
+    char aux;
+    int auxInt;
+    for (int i = 0; i++; i<2)
+    {
+        auxInt = 0;
+        switch(op[i].tipo) {
+
+            case 0x00: //tipo Memoria
+                aux = mv->Memoria[++ip];  //leo en un auxiliar el byte que dice el registro en el que se va a almacenar
+                op[i].segmentoReg = (aux >> 6) & 0x03;
+                aux = aux & 0x0F;
+                op[i].registro = (int)aux;
+                //printf("registro t mem op 1 %d\n",aux);
+
+                auxInt |= mv->Memoria[++ip] << 8; //leo en un int auxiliar los 2 bytes que representan el desplazamiento de bytes
+                auxInt |= (mv->Memoria[++ip] & 0x000000FF);
+
+                op[i].desplazamiento = auxInt;
+                //printf("desplazamiento t mem op 1 %d\n",aux);
+                break;
+
+            case 0x01: //tipo inmediato
+                auxInt |= mv->Memoria[++ip] << 8; //leo en un int auxiliar los 2 bytes que representan el numero inmediato
+                //printf("set inm %04X\n",auxInt);
+                auxInt |= (mv->Memoria[++ip] & 0x00FF);
+                //printf("set inm %04X\n",auxInt);
+                op[i].desplazamiento = auxInt;
+                break;
+
+            case 0x02: //tipo registro
+                aux = mv->Memoria[++ip];  //leo en un auxiliar el byte que dice el registro que voy a usar
+                aux = aux & 0x0F;
+                op[i].registro = aux;
+                //printf("registro op %d\n",aux);
+                aux = mv->Memoria[ip]; //leo en un auxiliar el byte y saco el segmento de registro
+                aux = aux >> 4;
+                op[i].segmentoReg = aux & 0x03;
+                //printf("segmento t reg op 1 %d\n",aux);
+                break;
+        }
+    }
+}
+
 int getReg(MaquinaVirtual *mv, operando op)
 {
     int n;
@@ -222,7 +222,7 @@ int getReg(MaquinaVirtual *mv, operando op)
         n = mv->registros[(int)op.registro];
         n = n << 24;
         n = n >> 24;
-    } 
+    }
     if ( op.segmentoReg == 0x02 ) { // AH
         n = mv->registros[(int)op.registro];
         n = n << 16;
@@ -238,7 +238,7 @@ int getReg(MaquinaVirtual *mv, operando op)
 }
 
 int getMem(MaquinaVirtual *mv, operando op) {
-    
+
     int num = 0;
     int posSeg = (mv->registros[op.registro] >> 16) & 0x0000000F;
     int puntero = (mv->registros[op.registro]) & 0x0000FFFF;
@@ -251,8 +251,8 @@ int getMem(MaquinaVirtual *mv, operando op) {
              num |= (0x000000FF & (mv->Memoria[mv->segmentos[posSeg].base + puntero + op.desplazamiento + 3]));
         } else {
             if ( op.segmentoReg == 0x02 ) { // segmento de 2 bytes
-                num |= mv->Memoria[mv->segmentos[posSeg].base + puntero + op.desplazamiento] << 8; 
-                num |= mv->Memoria[mv->segmentos[posSeg].base + puntero + op.desplazamiento + 1];   
+                num |= mv->Memoria[mv->segmentos[posSeg].base + puntero + op.desplazamiento] << 8;
+                num |= mv->Memoria[mv->segmentos[posSeg].base + puntero + op.desplazamiento + 1];
             } else { //segmento de 1 byte
                  num = mv->Memoria[mv->segmentos[posSeg].base + puntero + op.desplazamiento];
             }
@@ -269,9 +269,9 @@ int getOp(MaquinaVirtual *mv, operando op)
 
     if (op.tipo == reg)
         return getReg(mv,op);
-    if (op.tipo == mem ) 
+    if (op.tipo == mem )
         return getMem(mv,op);
-    else 
+    else
         return op.desplazamiento;
 }
 
@@ -308,12 +308,12 @@ void setOp(MaquinaVirtual *mv, operando op, int num)
                 mv->registros[IP] = mv->segmentos[0].size;
             }
             break;
-            
+
         case 0x02: //registro
             if (op.segmentoReg == 0x03) { //uso de los 2 ultimos bytes del registro
                 mv->registros[(int)op.registro] &= 0xFFFF0000; //mascara para inicializar los 2 bytes
                 mv->registros[(int)op.registro] |= (num & 0x0000FFFF); //ultimos 2 bytes del entero asignados
-            
+
             } else if (op.segmentoReg == 0x02) { //segmento 3er byte
                 mv->registros[(int)op.registro] &= 0xFFFF00FF; //limito el registro
                 mv->registros[(int)op.registro] |= ((num & 0x000000FF) << 8); //asigno al 3er byte
@@ -360,15 +360,15 @@ void imprimeOperando(operando op){
     }
 }
 
-//OPERACIONES DEL LENGUAGE 
+//OPERACIONES DEL LENGUAGE
 
 //funcion de asignacion al Condition Code
 void setCC(MaquinaVirtual *mv, int n){
     if ( n > 0 )
         mv->registros[CC] &= 0xCFFFFFFF; //0000
-    else if ( n < 0) 
+    else if ( n < 0)
         mv->registros[CC] &= 0x8FFFFFFF; //1000
-    else 
+    else
         mv->registros[CC] &= 0x4FFFFFFF; //0100
 } // N (1 si resultado negativo) Z (1 si resultado cero)
 
@@ -487,11 +487,11 @@ void JN(MaquinaVirtual *mv, operando *op){
 void JNZ(MaquinaVirtual *mv, operando *op){
     unsigned int aux = getOp(mv,op[0]);
     if (mv->registros[CC] & 0xF0000000 != 0x40000000)
-        mv->registros[IP] = aux; 
+        mv->registros[IP] = aux;
 }
 void JNP(MaquinaVirtual *mv, operando *op){
     unsigned int aux = getOp(mv,op[0]);
-    if (mv->registros[CC] & 0xF0000000 != 0x00000000) 
+    if (mv->registros[CC] & 0xF0000000 != 0x00000000)
         mv->registros[IP] = aux;
 }
 void JNN(MaquinaVirtual *mv, operando *op){
@@ -515,7 +515,7 @@ void NOT(MaquinaVirtual *mv, operando *op){
 }
 
 void STOP(MaquinaVirtual *mv, operando *op){
-    mv->registros[IP] = mv->segmentos[Pos_Seg(mv,CS)].size; 
+    mv->registros[IP] = mv->segmentos[Pos_Seg(mv,CS)].size;
 }
 
 void PUSH(MaquinaVirtual *mv, operando *op)
@@ -781,7 +781,7 @@ void breakPoint(MaquinaVirtual *mv,Sistema aux)
             scanf("%c\n",&key);
             if ( key == 13) {
                 ejecutaCiclo(mv,mv->header[5]);
-            } 
+            }
         } while ( key != 113 ); //para con el ingreso de la letra q
     }
 }
@@ -828,6 +828,18 @@ void obtieneTAG(char reg,char segmento,char nombre[]){
     case 0x00:strcpy(nombre,"CS");
         break;
     case 0x01:strcpy(nombre,"DS");
+        break;
+    case 0x02:strcpy(nombre,"ES");
+        break;
+    case 0x03:strcpy(nombre,"SS");
+        break;
+    case 0x04:strcpy(nombre,"KS");
+        break;
+    case 0x05:strcpy(nombre,"IP");
+        break;
+    case 0x06:strcpy(nombre,"SP");
+        break;
+    case 0x07:strcpy(nombre,"BP");
         break;
     case 0x08:strcpy(nombre,"CC");
         break;
