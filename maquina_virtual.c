@@ -6,7 +6,18 @@
 
 //retorna posicion del segmento contenido en los bytes del registro
  int Pos_Seg(MaquinaVirtual *mv, int segment) {
-    return (mv->registros[segment] >> 16);
+    int pos = 0, i = 0;
+    int vec[5] = {KS,CS,DS,ES,SS};
+
+    while ( i < 5 &&  )
+    {
+        if ( mv->registros[i] > 0 &&  ) {
+            pos++;
+        }
+        i++;
+    }
+
+    return pos;
 }
 
 int corrigeSize(int size)
@@ -20,13 +31,13 @@ int corrigeSize(int size)
 
 void cargaVF(Toperaciones *v){
     //2 operandos
-    v[0x00] = MOV; v[0x01] = ADD;
-    v[0x02] = SUB; v[0x03] = SWAP;
-    v[0x04] = MUL; v[0x05] = DIV;
-    v[0x06] = CMP; v[0x07] = SHL;
-    v[0x08] = SHR; v[0x09] = AND;
-    v[0x0A] = OR;  v[0x0B] = XOR;
-    v[0x0C] = RND;
+    v[0x0] = MOV; v[0x1] = ADD;
+    v[0x2] = SUB; v[0x3] = SWAP;
+    v[0x4] = MUL; v[0x5] = DIV;
+    v[0x6] = CMP; v[0x7] = SHL;
+    v[0x8] = SHR; v[0x9] = AND;
+    v[0xA] = OR;  v[0xB] = XOR;
+    v[0xC] = RND;
     //1 operando
     v[0x10] = SYS; v[0x11] = JMP;
     v[0x12] = JZ;  v[0x12] = JP;
@@ -35,7 +46,7 @@ void cargaVF(Toperaciones *v){
     v[0x17] = JNN; v[0x18] = LDL;
     v[0x19] = LDH; v[0x1A] = NOT;
     v[0x1B] = PUSH; v[0x1C] = POP;
-    v[0x1A] = CALL;
+    v[0x1D] = CALL;
     //0 operandos
     v[0x1E] = RET; v[0x1F] = STOP;
 }
@@ -43,31 +54,10 @@ void cargaVF(Toperaciones *v){
 //primer byte de la sentencia de 4
 void LeerByte(char instruccion, char *operando1, char *operando2, unsigned int *operacion)
 {
-     if((instruccion & 0x1F) == 0x1F)
-     {
-        if((instruccion & 0x03) == 0x00)
-            *operacion = 0x1F;
-        else{
-            *operacion = 0x1E;
-        }
-        *operando2 = 0x3;
-        *operando1 = 0x3;
-    } else {
-
-        *operando1 = (instruccion >> 6) & 0x03;
-        *operando2 = instruccion & 0x30;
-        if(*operando2 == 0x30){
-            *operacion = instruccion & 0x3F; //aislo codigo de operacion
-            *operando2 = 0x3;
-        }else{
-            *operacion = instruccion & 0x0F;
-            *operando2 = *operando2 >> 4;
-            *operando2 &= 0x03;// 0000 0011
-        }
-    }
+    *operacion = instruccion & 0x1F;
+    *operando1 = (instruccion >> 4) & 0x03;
+    *operando2 = (instruccion >> 6) & 0x03;
 }
-
-
 
 //aumenta la posicion del registro ip en funciona de la cantidad de bytes usadas por los operandos
 void sumaIP(int *ip,char operando1,char operando2){
@@ -107,11 +97,11 @@ void InformaError(MaquinaVirtual *mv, Error error){
     mv->registros[IP] = mv->segmentos[CS].size;
 }
 
-void ejecutaCiclo(MaquinaVirtual *mv, int version)
+void ejecutaCiclo(MaquinaVirtual *mv, char version, int ipAux)
 {
     unsigned int operacion, ok;
     operando op[2];
-    Toperaciones arrFunciones[256];
+    Toperaciones arrFunciones[32];
     Error error;
 
     cargaVF(arrFunciones);
@@ -120,15 +110,16 @@ void ejecutaCiclo(MaquinaVirtual *mv, int version)
 
     sumaIP(&(mv->registros[IP]), op[0].tipo, op[1].tipo);
 
-    recuperaOperandos(mv,op,mv->registros[IP]);
+    recuperaOperandos(mv,op,ipAux);
 
     switch (version) {
         case 1: ok = (operacion >= 0 && operacion <= 0x0C) || (operacion >= 0x10 && operacion <= 0x1A) || (operacion == 0x1F);
             break;
         case 2: ok = (operacion >= 0 && operacion <= 0x0C) || (operacion >= 0x10 && operacion <= 0x1F);
     }
-    if (ok)
-        arrFunciones[operacion](mv,op);
+    if (ok) {
+        *arrFunciones[operacion](mv,op);
+    }
     else {
         error.code = 0;
         error.invalidInstruction = operacion;
@@ -780,7 +771,7 @@ void breakPoint(MaquinaVirtual *mv,Sistema aux)
             creaArchivoDeImagen(*mv);
             scanf("%c\n",&key);
             if ( key == 13) {
-                ejecutaCiclo(mv,mv->header[5]);
+                ejecutaCiclo(mv,mv->header[5],mv->registros[IP]);
             }
         } while ( key != 113 ); //para con el ingreso de la letra q
     }

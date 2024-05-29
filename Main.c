@@ -4,9 +4,8 @@
 #include"maquina_virtual.h"
 
 
-void asignaSegmento(MaquinaVirtual *mv, unsigned short int tamSegmentos[5] );
 //inicializa la maquina virtual
-void cargaMV(MaquinaVirtual *mv, char *[], int *numInstrucciones, unsigned int memoria , char *version);
+void cargaMV(MaquinaVirtual *mv, char *, int *numInstrucciones, unsigned int memoria , char *version);
 //muestra el codigo assembler ingresado por archivo
 void disassembler(MaquinaVirtual *mv);
 //ejecucion del segmento de codigo
@@ -19,8 +18,9 @@ int main(int argc, char *argv[])
     int numInstrucciones = 0;
     int entraDisassembler = 0;
     char version;
+    char *filename;
     int entraCarga = 0;
-    unsigned int memoriaParam;
+    unsigned int memoriaParam = 0;
     unsigned int aux;
 
     //validacion de argumentos opcionales
@@ -31,6 +31,7 @@ int main(int argc, char *argv[])
         //verificar  [filename.vmx]
         if (len >= 4 && strcmp(argv[i] + len - 4, ".vmx") == 0) {
             entraCarga++;
+            filename = argv[i];
         }
 
         //verificar [filename.vmi]
@@ -54,9 +55,9 @@ int main(int argc, char *argv[])
     //printf("dissasembler: %d",entraDisassembler);
     if ( entraCarga )
     {
-        printf("\nInicio carga: \n\n");
-        cargaMV(&mv,argv,&numInstrucciones,memoriaParam,&version);
-        printf("\nInicio ejecucion: \n\n");
+        printf("\nInicio carga, archivo: %s \n\n\n", filename);
+        cargaMV(&mv,filename,&numInstrucciones,memoriaParam,&version);
+        //printf("\nInicio ejecucion: \n\n");
         ejecutarMV(&mv,version,numInstrucciones);
 
         if ( entraDisassembler ) disassembler(&mv);
@@ -66,81 +67,97 @@ int main(int argc, char *argv[])
 }
 
 
-void asignaSegmento(MaquinaVirtual *mv, unsigned short int tamSegmentos[5] )
-{
-    int contSegmentos = 0;
-    int vecOrden[5] = { KS, CS, DS, ES, SS};
-    unsigned short int sizeAnt = 0;
-
-    for ( int i = 0; i < 5; i++) {
-        if ( tamSegmentos[i] > 0) {
-            if ( contSegmentos == 0 ) {
-                mv->registros[vecOrden[i]] = 0;
-            } else {
-                mv->segmentos[vecOrden[i]].base = sizeAnt;
-                mv->segmentos[vecOrden[i]].size = tamSegmentos[i];
-                mv->registros[vecOrden[i]] = mv->segmentos[vecOrden[i]].base;
-            }
-            sizeAnt = tamSegmentos[i] + 1;
-            contSegmentos++;
-        } else {
-            mv->registros[vecOrden[i]] = -1;
-        }
-    }
-}
-
-void cargaMV(MaquinaVirtual *mv, char* argv[], int *numInstrucciones, unsigned int memoria , char *version)
+void cargaMV(MaquinaVirtual *mv, char* filename, int *numInstrucciones, unsigned int memoria , char *version)
 {
     char *header = (char*)malloc(6*sizeof(char));
     unsigned short int arrTamSegmentos[5];
     unsigned short int size = 0;
-    int i, cont, totalSize = 0;
+    unsigned int antSize = 0;
+    int i, cont, cantSeg = 0, totalSize = 0;
     unsigned short int offset = 0;
-    FILE *arch = fopen("sample.vmx","rb");
+
+    FILE *arch = fopen(filename,"rb");
 
     if( arch )
     {
         //comienza el proceso del archivo .vmx
         fgets(header, 6 * sizeof(char),arch); //obtentiene nombre del header
         if(strcmp(header,"VMX24") ) {
-            printf("error de extensiÃ³n");
+            printf("error de extensión");
         } else {
 
             //Tras verificar el encabezado, verifico la version de trabajo
             fread(version,sizeof(char),1,arch);
-            printf("header: %s, version: %02X",header,*version);
+            printf("header: %s, version: %02X\n",header,*version);
+
+            //Carga el header y el nombre del archivo .vmi;
+            for( i = 0; i < 5; i++ ) {
+                mv->header[i] = header[i];
+            }
+            mv->header[6] = (char) size >> 8;
+            mv->header[7] = (char) size;
+
             //inicializacion de segmentos
+            mv->segmentos[0].base = 0;
+
             if ( *version == 1)
             {
                 fread(&size,sizeof(unsigned short int),1,arch);
                 size = corrigeSize(size);
-                mv->segmentos[CS].base = 0x0000;
                 mv->segmentos[CS].size = size;
-                mv->registros[CS] = 0;
-
+                mv->registros[0] = 0;
                 mv->segmentos[DS].base = ( mv->segmentos[CS].size + 1);
-                mv->segmentos[DS].size = ( NUM_MEMORIA - mv->segmentos[CS].size );
-                mv->registros[DS] = 0x00000000 | mv->segmentos[DS].base;
+                mv->segmentos[DS].size = ( NUM_MEMORIA - mv->segmentos[DS].base );
+                mv->registros[DS] = (0x00000000 | mv->segmentos[DS].base) << 16;
+                mv->registros[ES] = -1;
+                mv->registros[SS] = -1;
+                mv->registros[KS] = -1;
+
+                mv->Memoria = (char *) malloc( sizeof(char) * NUM_MEMORIA );
 
             } else if ( *version == 2 ) {
-
-                //Carga el header y el nombre del archivo .vmi;
-                for( i = 0; i < 5; i++ ) {
-                    mv->header[i] = header[i];
-                }
-                mv->header[6] = (char) size >> 8;
-                mv->header[7] = (char) size;
-
                 //trabajo los segmentos de memoria
-                for(int j = 0; j < 5; j++) {
+                for(int j = 0; j < 5; j++)
+                {
                     fread(&size, sizeof(unsigned short int), 1, arch);
                     arrTamSegmentos[j] = size;
                     arrTamSegmentos[j] = corrigeSize(arrTamSegmentos[j]);
                 }
-                asignaSegmento(mv, arrTamSegmentos);
+                cantSeg = 0;
+                if ( arrTamSegmentos[KS] > 0 ) {
 
-                //validacion del tamaÃ±o de memoria
-                if ( memoria > 0 && memoria < totalSize ) {
+                    mv->segmentos[0].base = 0;
+                    mv->segmentos[0].size = arrTamSegmentos[KS];
+                    mv->registros[KS] = 0;
+                    totalSize += arrTamSegmentos[KS];
+                    antSize = arrTamSegmentos[KS];
+                    cantSeg++;
+                } else {
+                    mv->registros[KS] = -1;
+                }
+                for (int  k = 0; k < 4; k++)
+                    if ( arrTamSegmentos[k] > 0 ) {
+                        if ( k == 0 && mv->registros[KS] == -1 ) {
+                            mv->segmentos[k].base = 0;
+                        } else {
+                            mv->segmentos[k].base = antSize + 1;
+                        }
+                        mv->segmentos[k].size = arrTamSegmentos[k];
+                        mv->registros[k] = mv->segmentos[k].base << 16;
+                        mv->registros[k] &= 0xFFFF0000;
+                        if ( k == 3 ) {
+                            mv->registros[SP] = (cantSeg + 1) << 16;
+                        }
+                        totalSize += arrTamSegmentos[k];
+                        antSize = arrTamSegmentos[k];
+                        cantSeg++;
+                    } else {
+                        mv->registros[k];
+                    }
+
+
+                //validacion del tamaño de memoria
+                if ( ((memoria > 0) && (memoria < totalSize)) || ((memoria == 0) && (NUM_MEMORIA < totalSize))  ) {
                     printf( "\nERROR: MEMORIA INSUFICIENTE\n");
                     exit(EXIT_FAILURE);
                 } else {
@@ -150,40 +167,36 @@ void cargaMV(MaquinaVirtual *mv, char* argv[], int *numInstrucciones, unsigned i
                         mv->Memoria = (char *) malloc( sizeof(char) * NUM_MEMORIA);
                     }
                 }
-
+                //lectura del offset
                 fread(&offset, sizeof(unsigned short int), 1, arch);
-
-
-            } else {
-                printf(" error de version ");
-                exit(EXIT_FAILURE);
             }
+
             //bloque de lectura del binario para cargarlo en Memoria
             cont = 0;
             while (fread(&(mv->Memoria[cont]),sizeof(char),1,arch))
             {
+                //printf("%08X ",mv->Memoria[cont]);
                 cont++;
             }
             if (*version >  1) *numInstrucciones = cont;
         }
+    mv->registros[IP] = mv->segmentos[Pos_Seg(mv,CS)].base + offset;
+    } else {
+        printf("el archivo esta vacio");
     }
-    mv->registros[IP] = Pos_Seg(mv,CS) + offset;
     fclose(arch);
 }
 
 
 void ejecutarMV(MaquinaVirtual *mv, char version, int numInstrucciones)
 {
-
-    switch (version) {
-    case 1:
-        while(mv->registros[IP] < mv->segmentos[mv->registros[CS]].size)
-            ejecutaCiclo(mv,version);
-        break;
-    case 2:
-        while(mv->registros[IP] < mv->segmentos[Pos_Seg(mv,CS)].size || mv->registros[IP] < numInstrucciones)
-            ejecutaCiclo(mv,version);
-        break;
+    int ipAux;
+    int cont = 0;
+    printf("\n-------------\nEjecucion: \n\n------------\n");
+    while( cont < ( mv->segmentos[Pos_Seg(mv,CS)].base + mv->segmentos[Pos_Seg(mv,CS)].size ) ){
+        ipAux = mv->registros[IP];
+        ejecutaCiclo(mv,version,ipAux);
+        cont++;
     }
 }
 
@@ -197,7 +210,7 @@ void disassembler(MaquinaVirtual *mv)
     InstruccionDisassembler vecDisassembler[NUM_MEMORIA];
     unsigned int operacion;
     printf("\n-------------\n\nDisassembler: \n\n------------\n");
-    while(ipAssembler < mv->segmentos[Pos_Seg(mv,CS)].size)
+    while(ipAssembler < (mv->segmentos[].base + mv->segmentos[].size) )
     {
         LeerByte(mv->Memoria[ipAssembler],&(operandos[0].tipo),&(operandos[1].tipo),&operacion);
 
@@ -225,7 +238,7 @@ void disassembler(MaquinaVirtual *mv)
     for(int z = 0; z < i; z++)
     {
         printf("[%04X] ",vecDisassembler[z].ipInicio);
-        for(int ip = vecDisassembler[z].ipInicio; ip < vecDisassembler[z].ipFinal ;ip++){
+        for(int ip = vecDisassembler[z].ipInicio; ip < vecDisassembler[z].ipFinal ; ip++){
            printf("%02X ",mv->Memoria[ip] & 0xFF);
         }
 
@@ -237,5 +250,4 @@ void disassembler(MaquinaVirtual *mv)
 
         printf("\n");
     }
-
 }

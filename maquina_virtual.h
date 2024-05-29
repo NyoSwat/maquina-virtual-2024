@@ -21,8 +21,8 @@ typedef struct {
 
 //estructura del procesador de la maquina virtual
 typedef struct {
-    char *Memoria;  
-    int  registros[NUM_REGISTROS];    
+    char *Memoria;
+    int  registros[NUM_REGISTROS];
     struct segmentos{
        unsigned short int base,size;
     }segmentos[NUM_TABLA_SEGMENTOS];
@@ -57,7 +57,7 @@ int corrigeSize(int rango);
 void LeerByte(char instruccion, char *op1, char *op2, unsigned int *operacion);
 void sumaIP(int *ip,char operando1,char operando2);
 void InformaError(MaquinaVirtual *mv, Error error);
-void ejecutaCiclo(MaquinaVirtual *mv, int version);
+void ejecutaCiclo(MaquinaVirtual *mv, char version, int ipAux);
 
 //creacion de archivo de imagen vmi
 void creaArchivoDeImagen(MaquinaVirtual mv);
